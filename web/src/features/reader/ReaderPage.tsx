@@ -37,7 +37,6 @@ import { useUI } from '@/stores/ui'
 import { HelpDialog } from './chrome/HelpDialog'
 import { ReaderTopBar } from './chrome/ReaderTopBar'
 import { DebugControl } from './debug/DebugControl'
-import { DebugCaptureGate } from './debug/DebugCaptureGate'
 import { DebugInspector } from './debug/DebugInspector'
 import { BranchDrawer } from './drawers/BranchDrawer'
 import { MemoryDrawer } from './drawers/MemoryDrawer'
@@ -67,35 +66,28 @@ export function ReaderPage() {
   useReaderSession(saveId)
   useTitleOnExit(saveId)
 
-  if (presentation.isError || settings.isError) {
+  if (presentation.isError) {
     return (
       <div className="mx-auto max-w-lg px-6 py-[18vh]">
-        <LoadError
-          error={presentation.error ?? settings.error}
-          onRetry={() => {
-            void presentation.refetch()
-            void settings.refetch()
-          }}
-        />
+        <LoadError error={presentation.error} onRetry={() => void presentation.refetch()} />
       </div>
     )
   }
-  if (!presentation.data || !settings.data) return <div className="h-dvh" aria-busy />
+  if (!presentation.data) return <div className="h-dvh" aria-busy />
 
   return (
-    <DebugCaptureGate key={saveId} saveId={saveId} autoCapture={settings.data.play.auto_debug}>
-      <ReaderView
-        saveId={saveId}
-        presentation={presentation.data}
-        timeline={timeline.data}
-        loadEarlier={() => void timeline.fetchNextPage()}
-        loadingEarlier={timeline.isFetchingNextPage}
-        panels={panels.data?.panels}
-        reading={settings.data?.reading}
-        workTheme={settings.data?.use_work_theme !== false}
-        devTools={!!settings.data?.developer || presentation.data.dev_work}
-      />
-    </DebugCaptureGate>
+    <ReaderView
+      key={saveId}
+      saveId={saveId}
+      presentation={presentation.data}
+      timeline={timeline.data}
+      loadEarlier={() => void timeline.fetchNextPage()}
+      loadingEarlier={timeline.isFetchingNextPage}
+      panels={panels.data?.panels}
+      reading={settings.data?.reading}
+      workTheme={settings.data?.use_work_theme !== false}
+      devTools={!!settings.data?.developer || presentation.data.dev_work}
+    />
   )
 }
 
@@ -292,8 +284,7 @@ function ReaderView({ loadEarlier, loadingEarlier, saveId, presentation, timelin
               onOpenState={() => setDrawer('state')}
               compactions={presentation.compactions}
               onCompact={() => void actions.compact()}
-              onInspect={() => inspect()}
-              inspectorOpen={debugOpen}
+              onInspect={debugAvailable ? () => inspect() : undefined}
               debugControl={
                 <DebugControl
                   enabled={!!debug.data?.enabled}
