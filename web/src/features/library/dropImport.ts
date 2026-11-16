@@ -4,7 +4,16 @@
  * DataTransfer 的条目只在 drop 事件处理期间有效，所以 pickedFromDrop 先同步取出全部条目，再异步遍历。
  * 目录遍历用 File and Directory Entries API（webkitGetAsEntry，主流浏览器都支持）。
  */
-import { IMPORT_LIMITS, isAlwaysIgnored, isCardFile, isZipFile, pickedFromFolder, problem, type FolderEntry, type Picked } from './importSource'
+import {
+  IMPORT_LIMITS,
+  isAlwaysIgnored,
+  isCardFile,
+  isZipFile,
+  pickedFromFolder,
+  problem,
+  type FolderEntry,
+  type Picked,
+} from './importSource'
 
 /** 拖入的一项：目录条目（浏览器支持时）与文件。 */
 export interface DroppedItem {

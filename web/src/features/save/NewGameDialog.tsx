@@ -144,7 +144,14 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
             )}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Label>{t('newGame.pace')}</Label>
-              <ToggleGroup type="single" variant="segmented" size="sm" className="w-full sm:w-auto" value={pace} onValueChange={(v) => v && setPace(v)}>
+              <ToggleGroup
+                type="single"
+                variant="segmented"
+                size="sm"
+                className="w-full sm:w-auto"
+                value={pace}
+                onValueChange={(v) => v && setPace(v)}
+              >
                 {PACES.map((p) => (
                   <ToggleGroupItem key={p} value={p} aria-label={t(`paceHint.${p as 'short'}`)}>
                     {t(`pace.${p as 'short'}`)}
