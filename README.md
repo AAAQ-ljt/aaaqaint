@@ -2,6 +2,8 @@
 
 **AINT Is Not Tavern**，也读作 **Agentic Interactive Narrative Theatre**。
 
+> 本仓库是 [wahhheee/aint](https://github.com/wahhheee/aint) 的本地化分支，相对上游的改动与部署说明见 [FORK.md](FORK.md)。
+
 [介绍视频](https://www.bilibili.com/video/BV1GRxF6dEd5) · [AINT 格式作品创作指南](https://www.bilibili.com/video/BV1Bd4A61EQV)
 
 AINT 是在本机运行的 AI 互动小说运行时。玩家导入作品，配置模型 API，在浏览器中阅读、选择行动或自由输入。程序使用 Go 后端与 React 前端，发布为单个可执行文件，作品、设置和存档保存在本机。
