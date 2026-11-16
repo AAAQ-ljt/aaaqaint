@@ -26,14 +26,9 @@ AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署�
 - `internal/work/cardimport.go`：导入 SillyTavern 角色卡（PNG 中的 `ccv3`/`chara` 文本块、`.charx` 压缩包或裸 JSON），合成为 AINT 作品目录。
 - `internal/store/migrations/0002_work_title.sql`：`works.title_override`，用于只改作品显示名。前端对应 `WorkRenameDialog`。
 
-### 从上游同步的功能
+### 与上游仍有差异的部分
 
-本快照基于上游 `98a71ac`，并补回两项在上游此前提交中引入、快照时缺失的功能：
-
-- `1f47a41`：记忆整理状态与完整记忆索引注入（`internal/runtime/compact*.go`、`internal/save/memory.go`、`internal/contextx`、`MemoryIndexGuide`）。
-- `9277658`：阅读器的自动调试记录设置（`internal/settings`、前端 `DebugCaptureGate` 与开发者设置）。
-
-其余差异均为上文列出的本地改动，不涉及对上游代码的回退。
+本快照基于较早的代码整理，部分文件与上游 `main` 的较新提交不同（例如记忆整理状态、自动调试记录）。这些差异来自快照时点与本地取舍，不是对上游的回退。
 
 ## 许可
 
