@@ -1,10 +1,11 @@
 # 本仓库说明（Fork）
 
 - 上游项目：[wahhheee/aint](https://github.com/wahhheee/aint)，Apache-2.0
-- 本 fork：[AAAQ-ljt/aint](https://github.com/AAAQ-ljt/aint)
+- 本仓库：[AAAQ-ljt/aaaqaint](https://github.com/AAAQ-ljt/aaaqaint)，今后以此为准（canonical）
+- 远程：`origin` = 本仓库；`upstream` = 上游，只读参考、不合并
 - 本快照的父提交：上游 `98a71ac`（2026-11-14，v0.2.0-alpha.1 预发布说明）
 
-AINT 是本地运行的 AI 互动小说运行时。本 fork 用于个人部署：在本机或家里电脑运行 AINT，经 frp 与 Cloudflare Tunnel 用域名在手机和外网访问。
+AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署：在本机或家里电脑运行 AINT，经 frp 与 Cloudflare Tunnel 用域名在手机和外网访问。
 
 ## 相对上游的改动
 
@@ -31,4 +32,4 @@ AINT 是本地运行的 AI 互动小说运行时。本 fork 用于个人部署�
 
 ## 许可
 
-上游代码与版权声明见 `LICENSE`。按 Apache-2.0 第 4 条，本 fork 保留原有版权与许可声明，并在此说明修改内容；本 fork 的修改同样以 Apache-2.0 发布。
+上游代码与版权声明见 `LICENSE`。按 Apache-2.0 第 4 条，本仓库保留原有版权与许可声明，并在此说明修改内容；本仓库的修改同样以 Apache-2.0 发布。
