@@ -1,0 +1,15 @@
+# frp 服务端：运行在服务器，只接受 token 认证的 frpc。
+bindPort = 23456
+
+# 转发端口只监听回环：公网入口交给 Cloudflare Tunnel 的 cloudflared。
+proxyBindAddr = "127.0.0.1"
+
+auth.method = "token"
+auth.token = "<与 frpc 一致的随机串>"
+
+allowPorts = [
+  { start = 7860, end = 7860 }
+]
+
+# frpc 与 frps 之间的连接强制 TLS。
+transport.tls.force = true

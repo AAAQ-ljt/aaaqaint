@@ -1,0 +1,14 @@
+# frp 客户端：运行在本机，把 aint 的 7860 注册到服务器的 7860。
+serverAddr = "<服务器公网 IP>"
+serverPort = 23456
+loginFailExit = false
+
+auth.method = "token"
+auth.token = "<与 frps 一致的随机串>"
+
+[[proxies]]
+name = "aint"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 7860
+remotePort = 7860
