@@ -17,6 +17,7 @@ func (s *Server) routes() {
 	// 作品
 	m.HandleFunc("GET /api/v1/works", s.h(s.listWorks))
 	m.HandleFunc("GET /api/v1/works/{id}", s.h(s.getWork))
+	m.HandleFunc("PATCH /api/v1/works/{id}", s.h(s.renameWork))
 	m.HandleFunc("GET /api/v1/works/{id}/saves", s.h(s.listWorkSaves))
 	m.HandleFunc("POST /api/v1/works/import", s.h(s.importWork)) // zip / 文件夹 / GitHub / URL / 本机目录
 	m.HandleFunc("POST /api/v1/works/import/{task}/confirm", s.h(s.confirmImport))

@@ -26,7 +26,7 @@ import { formatBytes } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { countIssues, progressPercent, reportText, shelfRelation, sortIssues } from './importReport'
-import { IMPORT_LIMITS, pickedFromFileList, pickedFromZip } from './importSource'
+import { IMPORT_LIMITS, pickedFromFile, pickedFromFileList } from './importSource'
 import type { ImportStage, WorkImport } from './useWorkImport'
 import { WorkCover } from './WorkCover'
 
@@ -102,7 +102,11 @@ function SourceTabs({ tab, onTab, imp }: { tab: Tab; onTab: (t: Tab) => void; im
 
       <TabsContent value="file">
         <PickZone icon={PackageOpen} drop={t('import.fileDrop')} hint={limit}>
-          <FilePicker label={t('import.pickZip')} accept=".zip,application/zip" onFiles={(f) => imp.start(pickedFromZip(f))} />
+          <FilePicker
+            label={t('import.pickFile')}
+            accept=".zip,.png,.charx,.json,application/zip,image/png,application/json"
+            onFiles={(f) => imp.start(pickedFromFile(f))}
+          />
         </PickZone>
       </TabsContent>
       <TabsContent value="folder">

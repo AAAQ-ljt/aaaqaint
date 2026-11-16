@@ -71,7 +71,10 @@ export function useWorkImport(): WorkImport {
   useEffect(() => () => onUnmount(), [])
 
   const problemMessage = (p: InputProblem) =>
-    t(`import.problems.${p}`, { size: formatBytes(IMPORT_LIMITS.maxTotal), count: IMPORT_LIMITS.maxFiles })
+    t(`import.problems.${p}`, {
+      size: formatBytes(p === 'tooLargeCard' ? IMPORT_LIMITS.maxCard : IMPORT_LIMITS.maxTotal),
+      count: IMPORT_LIMITS.maxFiles,
+    })
 
   const upload = async (picked: Picked, id: number) => {
     if (picked.kind === 'problem') {

@@ -2,10 +2,16 @@ package server
 
 import (
 	"io/fs"
+	"mime"
 	"net/http"
 	"path"
 	"strings"
 )
+
+// init 纠正 Windows 注册表里 .svg 的 MIME：注册表常写 image/svg，浏览器会拒绝当图标。
+func init() {
+	_ = mime.AddExtensionType(".svg", "image/svg+xml")
+}
 
 // csp 是页面的内容安全策略（《02-技术方案》19）：作品内容不执行，面板 HTML 另经前端净化。
 const csp = "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; " +

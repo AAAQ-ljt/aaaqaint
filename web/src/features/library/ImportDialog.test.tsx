@@ -57,7 +57,7 @@ describe('ImportDialog', () => {
   it('选择：提供五种导入来源', () => {
     show(fakeImport({ step: 'select' }))
     for (const name of ['文件', '文件夹', 'GitHub', '链接', '开发目录']) expect(screen.getByRole('tab', { name })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '选择 zip 包' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '选择 zip 包或角色卡' })).toBeTruthy()
   })
 
   it('选择 zip 文件后开始导入', () => {

@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/wahhheee/aint/internal/pkg/errs"
@@ -87,20 +89,38 @@ func newRequestID() string {
 	return hex.EncodeToString(b[:])
 }
 
-// hostGuard 防 DNS 重绑定：Host 必须是 IP 字面量或 localhost（《02-技术方案》18.1，对玩家无感）。
+// hostGuard 防 DNS 重绑定：Host 必须是 IP 字面量、localhost，或在 AINT_ALLOWED_HOSTS 中显式放行的域名
+// （《02-技术方案》18.1）。放行域名用于经反向代理 / 隧道以域名访问（如 Cloudflare Tunnel）。
 func hostGuard(next http.Handler) http.Handler {
+	allowed := allowedHosts()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
 		if h, _, err := net.SplitHostPort(host); err == nil {
 			host = h
 		}
 		host = strings.Trim(host, "[]")
-		if host != "localhost" && net.ParseIP(host) == nil {
-			writeError(w, r, errs.New(errs.CodeForbidden, "请通过 IP 地址或 localhost 访问（当前 Host：%s）", r.Host))
+		if host == "localhost" || net.ParseIP(host) != nil || allowed[strings.ToLower(host)] {
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		writeError(w, r, errs.New(errs.CodeForbidden, "请通过 IP 地址或 localhost 访问（当前 Host：%s）", r.Host))
 	})
+}
+
+var (
+	allowedHostsOnce sync.Once
+	allowedHostsSet  map[string]bool
+)
+
+// allowedHosts 从环境变量 AINT_ALLOWED_HOSTS 读取额外放行的域名（逗号或空格分隔，大小写不敏感）。
+func allowedHosts() map[string]bool {
+	allowedHostsOnce.Do(func() {
+		allowedHostsSet = map[string]bool{}
+		for _, h := range strings.FieldsFunc(os.Getenv("AINT_ALLOWED_HOSTS"), func(c rune) bool { return c == ',' || c == ' ' }) {
+			allowedHostsSet[strings.ToLower(strings.TrimSpace(h))] = true
+		}
+	})
+	return allowedHostsSet
 }
 
 // crossOrigin 拒绝跨站的有副作用请求（防止恶意网页调用本地接口、消耗额度或删改存档）。

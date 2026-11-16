@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/wahhheee/aint/internal/pkg/jsonx"
 	"github.com/wahhheee/aint/internal/store"
@@ -36,12 +39,67 @@ func findVersionByHash(ctx context.Context, q store.Querier, workID, treeHash st
 
 func upsertWork(ctx context.Context, q store.Querier, id, title, latestVersionID string) error {
 	now := store.NowMillis()
+	// title 跟随版本清单；玩家的重命名单独记在 title_override，读取时优先。
 	_, err := q.ExecContext(ctx, `
 		INSERT INTO works (id, title, latest_version_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)
 		ON CONFLICT (id) DO UPDATE SET title = excluded.title, latest_version_id = excluded.latest_version_id,
 		                               updated_at = excluded.updated_at`,
 		id, title, latestVersionID, now, now)
 	return err
+}
+
+// renameWork 把作品改成玩家指定的名称；title_override 优先于版本清单里的标题。
+func renameWork(ctx context.Context, q store.Querier, id, title string) (bool, error) {
+	res, err := q.ExecContext(ctx, `UPDATE works SET title = ?, title_override = ?, updated_at = ? WHERE id = ?`,
+		title, title, store.NowMillis(), id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// versionStrings 返回作品已有的版本号集合，用于避免再导入时出现重复的版本标签。
+func versionStrings(ctx context.Context, q store.Querier, workID string) (map[string]bool, error) {
+	rows, err := q.QueryContext(ctx, `SELECT version FROM work_versions WHERE work_id = ?`, workID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		out[v] = true
+	}
+	return out, rows.Err()
+}
+
+// bumpVersion 在版本号已存在时递增 patch，直到没有冲突（保留预发布 / 构建后缀）。
+func bumpVersion(v string, used map[string]bool) string {
+	if !used[v] {
+		return v
+	}
+	core, suffix := v, ""
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		core, suffix = v[:i], v[i:]
+	}
+	parts := strings.Split(core, ".")
+	for len(parts) < 3 {
+		parts = append(parts, "0")
+	}
+	major, _ := strconv.Atoi(parts[0])
+	minor, _ := strconv.Atoi(parts[1])
+	patch, _ := strconv.Atoi(parts[2])
+	for {
+		patch++
+		candidate := fmt.Sprintf("%d.%d.%d%s", major, minor, patch, suffix)
+		if !used[candidate] {
+			return candidate
+		}
+	}
 }
 
 func insertVersion(ctx context.Context, q store.Querier, v versionRow) error {
@@ -113,6 +171,7 @@ func listVersions(ctx context.Context, q store.Querier, workID string) ([]versio
 
 type workRow struct {
 	ID              string
+	TitleOverride   string
 	LatestVersionID string
 	SaveCount       int
 	UpdatedAt       int64
@@ -120,7 +179,7 @@ type workRow struct {
 
 func listWorks(ctx context.Context, q store.Querier) ([]workRow, error) {
 	rows, err := q.QueryContext(ctx, `
-		SELECT w.id, COALESCE(w.latest_version_id, ''), w.updated_at,
+		SELECT w.id, COALESCE(w.title_override, ''), COALESCE(w.latest_version_id, ''), w.updated_at,
 		       (SELECT COUNT(*) FROM saves s WHERE s.work_id = w.id)
 		FROM works w ORDER BY w.updated_at DESC`)
 	if err != nil {
@@ -130,7 +189,7 @@ func listWorks(ctx context.Context, q store.Querier) ([]workRow, error) {
 	var out []workRow
 	for rows.Next() {
 		var r workRow
-		if err := rows.Scan(&r.ID, &r.LatestVersionID, &r.UpdatedAt, &r.SaveCount); err != nil {
+		if err := rows.Scan(&r.ID, &r.TitleOverride, &r.LatestVersionID, &r.UpdatedAt, &r.SaveCount); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -153,9 +212,9 @@ func deleteWorkWithSaves(ctx context.Context, tx *sql.Tx, id string) error {
 func getWork(ctx context.Context, q store.Querier, id string) (workRow, error) {
 	var r workRow
 	err := q.QueryRowContext(ctx, `
-		SELECT w.id, COALESCE(w.latest_version_id, ''), w.updated_at,
+		SELECT w.id, COALESCE(w.title_override, ''), COALESCE(w.latest_version_id, ''), w.updated_at,
 		       (SELECT COUNT(*) FROM saves s WHERE s.work_id = w.id)
-		FROM works w WHERE w.id = ?`, id).Scan(&r.ID, &r.LatestVersionID, &r.UpdatedAt, &r.SaveCount)
+		FROM works w WHERE w.id = ?`, id).Scan(&r.ID, &r.TitleOverride, &r.LatestVersionID, &r.UpdatedAt, &r.SaveCount)
 	return r, err
 }
 

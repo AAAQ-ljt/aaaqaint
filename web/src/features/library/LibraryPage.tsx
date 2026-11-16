@@ -1,16 +1,21 @@
-import { PackageOpen, Plus } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { PackageOpen, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { toast } from 'sonner'
 
-import { useRecentSaves, useWorks } from '@/api/queries'
+import { errorMessage } from '@/api/errors'
+import { qk, useRecentSaves, useRenameWork, useVersionActions, useWorks } from '@/api/queries'
 import type { Save, WorkSummary } from '@/api/types'
+import { confirmAction } from '@/components/common/confirm'
 import { LoadError } from '@/components/common/LoadError'
 import { PageHeader, SectionHeading } from '@/components/common/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatRelative, saveTitle } from '@/lib/format'
+
+import { WorkRenameDialog } from '@/features/work/WorkRenameDialog'
 
 import { pickedFromDrop } from './dropImport'
 import { ImportDialog } from './ImportDialog'
@@ -115,19 +120,78 @@ function DropOverlay() {
 /** 书架上的一本书：封面 + 书名 + 一行副标题 + 存档数。 */
 function ShelfBook({ work }: { work: WorkSummary }) {
   const { t } = useTranslation()
+  const qc = useQueryClient()
+  const actions = useVersionActions(work.id)
+  const rename = useRenameWork()
+  const [renaming, setRenaming] = useState(false)
+
+  const remove = async () => {
+    if (!(await confirmAction(t('library.removeConfirm', { title: work.title, count: work.save_count })))) return
+    try {
+      await actions.remove.mutateAsync(undefined)
+      await qc.invalidateQueries({ queryKey: qk.works })
+      await qc.invalidateQueries({ queryKey: qk.recentSaves })
+      toast(t('library.removed'))
+    } catch (e) {
+      toast.error(errorMessage(e))
+    }
+  }
+
   return (
-    <Link to={`/works/${encodeURIComponent(work.id)}`} className="group block rounded-sm outline-offset-4">
-      <WorkCover
-        id={work.id}
+    <div className="group relative">
+      <Link to={`/works/${encodeURIComponent(work.id)}`} className="block rounded-sm outline-offset-4">
+        <WorkCover
+          id={work.id}
+          title={work.title}
+          dev={work.latest.is_dev}
+          image={work.cover_url}
+          className="transition-[translate,box-shadow] duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-lift"
+        />
+        <p className="mt-4 truncate font-serif text-[15px] leading-6 font-semibold tracking-[0.04em] text-ink">{work.title}</p>
+        <p className="truncate text-xs leading-5 text-ink-muted">{work.subtitle || ' '}</p>
+        <p className="mt-1 text-xs leading-5 text-ink-faint">{t('library.saveCount', { count: work.save_count })}</p>
+      </Link>
+      <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('library.rename')}
+          title={t('library.rename')}
+          onClick={() => setRenaming(true)}
+          className="size-8 rounded-full bg-paper/85 text-ink-muted shadow-sm hover:text-ink"
+        >
+          <Pencil className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t('library.remove')}
+          title={t('library.remove')}
+          disabled={actions.remove.isPending}
+          onClick={() => void remove()}
+          className="size-8 rounded-full bg-paper/85 text-ink-muted shadow-sm hover:text-danger"
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
+      <WorkRenameDialog
+        open={renaming}
         title={work.title}
-        dev={work.latest.is_dev}
-        image={work.cover_url}
-        className="transition-[translate,box-shadow] duration-300 ease-out group-hover:-translate-y-1 group-hover:shadow-lift"
+        onClose={() => setRenaming(false)}
+        onSubmit={(title) =>
+          rename.mutate(
+            { id: work.id, title },
+            {
+              onSuccess: () => {
+                setRenaming(false)
+                toast(t('library.renamed'))
+              },
+              onError: (e) => toast.error(errorMessage(e)),
+            },
+          )
+        }
       />
-      <p className="mt-4 truncate font-serif text-[15px] leading-6 font-semibold tracking-[0.04em] text-ink">{work.title}</p>
-      <p className="truncate text-xs leading-5 text-ink-muted">{work.subtitle || ' '}</p>
-      <p className="mt-1 text-xs leading-5 text-ink-faint">{t('library.saveCount', { count: work.save_count })}</p>
-    </Link>
+    </div>
   )
 }
 

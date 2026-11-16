@@ -84,13 +84,13 @@ describe('pickedFromDropped', () => {
   })
 
   it('不能导入的情况', async () => {
-    const png = new File(['x'], 'cover.png')
+    const txt = new File(['x'], 'notes.txt')
     expect(await pickedFromDropped([])).toEqual({ kind: 'problem', problem: 'empty' })
-    expect(await pickedFromDropped([{ entry: null, file: png }])).toEqual({ kind: 'problem', problem: 'notZip' })
+    expect(await pickedFromDropped([{ entry: null, file: txt }])).toEqual({ kind: 'problem', problem: 'notZip' })
     expect(
       await pickedFromDropped([
         { entry: misty(), file: null },
-        { entry: null, file: png },
+        { entry: null, file: txt },
       ]),
     ).toEqual({ kind: 'problem', problem: 'multiple' })
     expect(await pickedFromDropped([{ entry: dirEntry('/empty', { '.git': { HEAD: 'x' } }), file: null }])).toEqual({

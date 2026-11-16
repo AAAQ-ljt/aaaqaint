@@ -1,9 +1,11 @@
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useParams } from 'react-router'
+import { toast } from 'sonner'
 
-import { useWork, useWorkSaves } from '@/api/queries'
+import { errorMessage } from '@/api/errors'
+import { useRenameWork, useWork, useWorkSaves } from '@/api/queries'
 import type { WorkDetail } from '@/api/types'
 import { LoadError } from '@/components/common/LoadError'
 import { SafeHTML } from '@/components/common/SafeHTML'
@@ -13,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { WorkCover } from '@/features/library/WorkCover'
 import { NewGameDialog } from '@/features/save/NewGameDialog'
 import { VersionList } from './VersionList'
+import { WorkRenameDialog } from './WorkRenameDialog'
 
 import { ReportList } from './ReportList'
 import { SaveList } from './SaveList'
@@ -33,7 +36,9 @@ export function WorkDetailPage() {
   const { t } = useTranslation()
   const work = useWork(workId)
   const saves = useWorkSaves(workId)
+  const rename = useRenameWork()
   const [starting, setStarting] = useState(false)
+  const [renaming, setRenaming] = useState(false)
 
   if (work.isError) {
     return (
@@ -54,7 +59,19 @@ export function WorkDetailPage() {
       <div className="grid gap-8 sm:grid-cols-[176px_minmax(0,1fr)] md:grid-cols-[208px_minmax(0,1fr)] md:gap-12">
         <WorkCover id={w.id} title={w.title} dev={w.latest.is_dev} image={w.cover_url} className="w-40 sm:w-full" />
         <div className="min-w-0">
-          <h1 className="title-book text-[32px] leading-[1.25] tracking-[0.1em] md:text-[36px]">{w.title}</h1>
+          <div className="flex items-start gap-2">
+            <h1 className="title-book text-[32px] leading-[1.25] tracking-[0.1em] md:text-[36px]">{w.title}</h1>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('library.rename')}
+              title={t('library.rename')}
+              onClick={() => setRenaming(true)}
+              className="mt-2 shrink-0 text-ink-muted"
+            >
+              <Pencil className="size-4" />
+            </Button>
+          </div>
           {w.subtitle && <p className="mt-2 font-serif text-base leading-7 text-ink-muted">{w.subtitle}</p>}
           {w.description && <p className="mt-5 max-w-[60ch] text-[15px] leading-7 text-ink">{w.description}</p>}
           <Meta work={w} />
@@ -113,6 +130,23 @@ export function WorkDetailPage() {
       </Tabs>
 
       <NewGameDialog work={w} open={starting} onOpenChange={setStarting} />
+      <WorkRenameDialog
+        open={renaming}
+        title={w.title}
+        onClose={() => setRenaming(false)}
+        onSubmit={(title) =>
+          rename.mutate(
+            { id: w.id, title },
+            {
+              onSuccess: () => {
+                setRenaming(false)
+                toast(t('library.renamed'))
+              },
+              onError: (e) => toast.error(errorMessage(e)),
+            },
+          )
+        }
+      />
     </div>
   )
 }

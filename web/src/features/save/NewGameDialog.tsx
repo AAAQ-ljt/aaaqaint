@@ -71,14 +71,14 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto p-5 sm:max-w-lg sm:p-6">
         <DialogHeader>
           <DialogTitle className="title-book">{t('newGame.title')}</DialogTitle>
           <p className="text-[13px] text-ink-muted">{work.title}</p>
           <DialogDescription className="sr-only">{t('newGame.title')}</DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-8">
+        <form onSubmit={submit} className="space-y-6 sm:space-y-8">
           <div className="space-y-2">
             <Label htmlFor="save-title">{t('newGame.saveName')}</Label>
             <Input
@@ -90,7 +90,7 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
           </div>
 
           {fields.length > 0 && (
-            <fieldset className="space-y-5">
+            <fieldset className="space-y-4 sm:space-y-5">
               <legend className="mb-4 w-full border-b border-rule pb-2 text-[13px] font-medium text-ink-muted">
                 {t('newGame.workSection')}
               </legend>
@@ -108,11 +108,11 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
             </fieldset>
           )}
 
-          <fieldset className="space-y-5">
+          <fieldset className="space-y-4 sm:space-y-5">
             <legend className="mb-4 w-full border-b border-rule pb-2 text-[13px] font-medium text-ink-muted">
               {t('newGame.runSection')}
             </legend>
-            <div className="flex items-baseline justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Label htmlFor="new-model">{t('newGame.model')}</Label>
               {noModel ? (
                 <span className="text-sm text-warn">
@@ -124,7 +124,7 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
               ) : (
                 <select
                   id="new-model"
-                  className="h-9 max-w-[65%] rounded-lg border border-rule bg-paper px-2 text-sm"
+                  className="h-9 w-full rounded-lg border border-rule bg-paper px-2 text-sm sm:max-w-[60%]"
                   value={model?.id ?? ''}
                   onChange={(e) => setModelId(e.target.value)}
                 >
@@ -142,9 +142,9 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
                 {t(work.requires.vision === 'required' ? 'newGame.visionRequired' : 'newGame.visionPreferred')}
               </p>
             )}
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Label>{t('newGame.pace')}</Label>
-              <ToggleGroup type="single" variant="segmented" size="sm" value={pace} onValueChange={(v) => v && setPace(v)}>
+              <ToggleGroup type="single" variant="segmented" size="sm" className="w-full sm:w-auto" value={pace} onValueChange={(v) => v && setPace(v)}>
                 {PACES.map((p) => (
                   <ToggleGroupItem key={p} value={p} aria-label={t(`paceHint.${p as 'short'}`)}>
                     {t(`pace.${p as 'short'}`)}
@@ -152,7 +152,7 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
                 ))}
               </ToggleGroup>
             </div>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <Label>
                 {t('newGame.reasoning')}
                 {work.narrator.reasoning && (
@@ -165,6 +165,7 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
                 type="single"
                 variant="outline"
                 size="sm"
+                className="w-full flex-wrap sm:w-auto"
                 value={reasoning}
                 onValueChange={(v) => v && setReasoning(v as Reasoning)}
               >
@@ -203,10 +204,10 @@ export function NewGameDialog({ work, open, onOpenChange }: Props) {
           )}
 
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => onOpenChange(false)}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit" disabled={create.isPending || noModel} className="min-w-24">
+            <Button type="submit" disabled={create.isPending || noModel} className="w-full min-w-24 sm:w-auto">
               {t('newGame.start')}
             </Button>
           </DialogFooter>

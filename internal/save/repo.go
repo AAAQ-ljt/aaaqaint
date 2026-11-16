@@ -77,7 +77,7 @@ func setHead(ctx context.Context, q store.Querier, saveID, headID string, played
 
 // saveColumns 附带作品标题、head 的回合号与分支数（叶子数），存档列表与详情都用它。
 // 编辑、整理节点的回合号是它们所跟随的回合，head 停在这类节点上时回合数照样正确。
-const saveColumns = `s.id, s.work_id, s.work_version_id, w.title, COALESCE(s.title, ''), COALESCE(s.title_source, ''),
+const saveColumns = `s.id, s.work_id, s.work_version_id, COALESCE(NULLIF(w.title_override, ''), w.title), COALESCE(s.title, ''), COALESCE(s.title_source, ''),
 	COALESCE(s.head_node_id, ''), COALESCE(n.turn_no, 0),
 	(SELECT COUNT(*) FROM nodes c WHERE c.save_id = s.id
 		AND NOT EXISTS (SELECT 1 FROM nodes k WHERE k.save_id = c.save_id AND k.parent_id = c.id)),

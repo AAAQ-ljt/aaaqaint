@@ -38,3 +38,11 @@ desktop.ini
 
 web/test-results/
 web/playwright-report/
+
+# 部署目录中的本地配置（含 token 与服务地址）
+deploy/*.local.toml
+*.pem
+
+# Windows 资源编译产物
+*.syso
+

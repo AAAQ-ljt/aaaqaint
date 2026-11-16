@@ -138,15 +138,11 @@ func workPrompt(args []string) error {
 	features := contextx.Profile(m, settings, model.Caps, *helpers)
 	env := contextx.Envelope{Input: save.TurnInput{Kind: save.InputOpening}, Text: "请按开场指引开始故事。", Pace: settings.Pace}
 	// 初始记忆 = 作品 memory/ 模板（与 save.Create 一致）
-	var memory save.MemoryIndex
+	var memory []save.MemoryEntry
 	for _, p := range set.Paths() {
 		if rest, ok := strings.CutPrefix(p, "memory/"); ok {
 			data, _ := set.Get(p)
-			if rest == "index.md" {
-				text := string(data)
-				memory.Text = &text
-			}
-			memory.Entries = append(memory.Entries, save.MemoryEntry{Path: "/memory/" + rest, Summary: vfs.Summary(string(data))})
+			memory = append(memory, save.MemoryEntry{Path: "/memory/" + rest, Summary: vfs.Summary(string(data))})
 		}
 	}
 	op, err := m.Opening(*openingID)

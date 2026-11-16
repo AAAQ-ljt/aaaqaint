@@ -122,6 +122,17 @@ export function useUpdateSettings() {
 export const useWorks = () => useQuery({ queryKey: qk.works, queryFn: api.works.list })
 export const useWork = (id: string) => useQuery({ queryKey: qk.work(id), queryFn: () => api.works.get(id) })
 export const useWorkSaves = (id: string) => useQuery({ queryKey: qk.workSaves(id), queryFn: () => api.works.saves(id) })
+
+export function useRenameWork() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => api.works.rename(id, title),
+    onSuccess: (d, { id }) => {
+      qc.setQueryData(qk.work(id), d)
+      void qc.invalidateQueries({ queryKey: qk.works, exact: true })
+    },
+  })
+}
 export const useRecentSaves = () => useQuery({ queryKey: qk.recentSaves, queryFn: () => api.saves.recent(6) })
 
 /**

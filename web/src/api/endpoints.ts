@@ -99,6 +99,7 @@ export const api = {
     exportURL: (id: string, versionId: string) => `/api/v1/works/${encodeURIComponent(id)}/versions/${versionId}/export`,
     list: () => http.get<WorkSummary[]>('/works'),
     get: (id: string) => http.get<WorkDetail>(`/works/${encodeURIComponent(id)}`),
+    rename: (id: string, title: string) => http.patch<WorkDetail>(`/works/${encodeURIComponent(id)}`, { title }),
     saves: (id: string) => http.get<Save[]>(`/works/${encodeURIComponent(id)}/saves`),
     report: (id: string, versionId: string) => http.get<Report>(`/works/${encodeURIComponent(id)}/versions/${versionId}/report`),
     /** 导入第一步：上传 zip 包或文件夹（表单见 features/library/importSource.ts），解析与校验，不写入 */

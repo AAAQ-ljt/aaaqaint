@@ -7,10 +7,11 @@ import {
   inputName,
   inputSize,
   isAlwaysIgnored,
+  isCardFile,
   isZipFile,
+  pickedFromFile,
   pickedFromFileList,
   pickedFromFolder,
-  pickedFromZip,
   type FolderEntry,
   type ImportInput,
 } from './importSource'
@@ -42,7 +43,7 @@ describe('isAlwaysIgnored', () => {
   })
 })
 
-describe('isZipFile / pickedFromZip', () => {
+describe('isZipFile / pickedFromFile', () => {
   it('按扩展名或 MIME 判断', () => {
     expect(isZipFile(file('作品.ZIP'))).toBe(true)
     expect(isZipFile(file('download', 'x', 'application/x-zip-compressed'))).toBe(true)
@@ -51,11 +52,14 @@ describe('isZipFile / pickedFromZip', () => {
 
   it('只接受一个 zip 文件', () => {
     const zip = file('misty.zip')
-    expect(pickedFromZip([zip])).toEqual({ kind: 'zip', file: zip })
-    expect(pickedFromZip([])).toEqual({ kind: 'problem', problem: 'empty' })
-    expect(pickedFromZip(null)).toEqual({ kind: 'problem', problem: 'empty' })
-    expect(pickedFromZip([zip, file('b.zip')])).toEqual({ kind: 'problem', problem: 'multiple' })
-    expect(pickedFromZip([file('cover.png')])).toEqual({ kind: 'problem', problem: 'notZip' })
+    expect(pickedFromFile([zip])).toEqual({ kind: 'zip', file: zip })
+    expect(pickedFromFile([])).toEqual({ kind: 'problem', problem: 'empty' })
+    expect(pickedFromFile(null)).toEqual({ kind: 'problem', problem: 'empty' })
+    expect(pickedFromFile([zip, file('b.zip')])).toEqual({ kind: 'problem', problem: 'multiple' })
+    const card = file('cover.png')
+    expect(pickedFromFile([card])).toEqual({ kind: 'card', file: card })
+    expect(pickedFromFile([file('cover.txt')])).toEqual({ kind: 'problem', problem: 'notZip' })
+    expect(isCardFile(file('x.charx'))).toBe(true)
   })
 })
 

@@ -20,7 +20,7 @@ import (
 
 // Source 记录作品版本的来源（work_versions.source）。
 type Source struct {
-	Type   string `json:"type"`            // zip | dir | github | url | dev | builtin
+	Type   string `json:"type"`            // zip | card | dir | github | url | dev | builtin
 	Name   string `json:"name,omitzero"`   // builtin 名称、zip 文件名、浏览器上传的文件夹名
 	Path   string `json:"path,omitzero"`   // dev 的本机路径（dir 是浏览器上传的文件夹，没有路径）
 	Repo   string `json:"repo,omitzero"`   // github：owner/repo
@@ -94,12 +94,20 @@ func (s *Service) ImportFileSet(ctx context.Context, set *FileSet, src Source) (
 			return nil
 		}
 		res.VersionID, res.Created = ids.New(), true
+		// 新版本与已有版本号冲突时递增 patch（角色卡常把 character_version 写死为 1.0.0）。
+		version := m.Manifest.Version
+		if used, err := versionStrings(ctx, tx, m.Manifest.ID); err != nil {
+			return err
+		} else if used[version] {
+			version = bumpVersion(version, used)
+		}
+		m.Manifest.Version = version
 		// works 行需先于 work_versions 存在（外键）
 		if err := upsertWork(ctx, tx, m.Manifest.ID, m.Manifest.Title, res.VersionID); err != nil {
 			return err
 		}
 		if err := insertVersion(ctx, tx, versionRow{
-			ID: res.VersionID, WorkID: m.Manifest.ID, Version: m.Manifest.Version, TreeHash: m.TreeHash,
+			ID: res.VersionID, WorkID: m.Manifest.ID, Version: version, TreeHash: m.TreeHash,
 			Source: src, Manifest: m.Manifest, Report: *rep, ImportedAt: store.NowMillis(),
 		}); err != nil {
 			return err
@@ -218,8 +226,12 @@ func versionInfo(v versionRow) VersionInfo {
 
 func summaryOf(w workRow, v versionRow) Summary {
 	mf := v.Manifest
+	title := mf.Title
+	if w.TitleOverride != "" {
+		title = w.TitleOverride
+	}
 	return Summary{
-		ID: w.ID, Title: mf.Title, Subtitle: mf.Subtitle, Description: mf.Description,
+		ID: w.ID, Title: title, Subtitle: mf.Subtitle, Description: mf.Description,
 		Tags: nonNil(mf.Tags), ContentRating: mf.ContentRating, Authors: nonNil(mf.Authors),
 		Latest: versionInfo(v), SaveCount: w.SaveCount, UpdatedAt: w.UpdatedAt,
 	}
@@ -295,6 +307,30 @@ func (s *Service) Get(ctx context.Context, workID string) (*Detail, error) {
 		}
 	}
 	return d, nil
+}
+
+// Rename 修改作品名称。名称覆盖随作品保存，之后导入新版本不会把它改回去。
+func (s *Service) Rename(ctx context.Context, workID, title string) error {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return errs.Invalid("作品名称不能为空")
+	}
+	if len([]rune(title)) > 200 {
+		return errs.Invalid("作品名称过长（最多 200 字）")
+	}
+	var ok bool
+	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+		var err error
+		ok, err = renameWork(ctx, tx, workID, title)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errs.NotFound("作品不存在：%s", workID)
+	}
+	return nil
 }
 
 // Report 返回作品版本入库时的校验报告。

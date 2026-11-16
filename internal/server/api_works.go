@@ -28,6 +28,25 @@ func (s *Server) getWork(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+// renameWork：PATCH /works/{id} —— 修改作品名称，返回更新后的详情。
+func (s *Server) renameWork(w http.ResponseWriter, r *http.Request) error {
+	var req struct {
+		Title string `json:"title"`
+	}
+	if err := decode(r, &req); err != nil {
+		return err
+	}
+	if err := s.d.Works.Rename(r.Context(), r.PathValue("id"), req.Title); err != nil {
+		return err
+	}
+	d, err := s.d.Works.Get(r.Context(), r.PathValue("id"))
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusOK, d)
+	return nil
+}
+
 // versionReport：GET /works/{id}/versions/{vid}/report，版本入库时的校验报告。
 func (s *Server) versionReport(w http.ResponseWriter, r *http.Request) error {
 	rep, err := s.d.Works.Report(r.Context(), r.PathValue("id"), r.PathValue("vid"))
@@ -123,6 +142,11 @@ func (s *Server) readImport(r *http.Request) (*work.ImportPreview, error) {
 					name = part.FileName()
 				}
 				return s.d.Imports.PreviewZip(ctx, name, part) // zip 只有一个文件，其后的内容不再读取
+			case "card":
+				if name == "" {
+					name = part.FileName()
+				}
+				return s.d.Imports.PreviewCard(ctx, name, part) // 角色卡只有一个文件
 			case "dir":
 				if path == "" {
 					return nil, errs.Invalid("文件缺少相对路径（path 字段应在 file 之前）")
@@ -132,7 +156,7 @@ func (s *Server) readImport(r *http.Request) (*work.ImportPreview, error) {
 				}
 				err, path = folder.Add(path, part), ""
 			default:
-				return nil, errs.Invalid("source 应为 zip 或 dir，且写在文件之前")
+				return nil, errs.Invalid("source 应为 zip、card 或 dir，且写在文件之前")
 			}
 		default:
 			return nil, errs.Invalid("未知的表单字段：%s", part.FormName())

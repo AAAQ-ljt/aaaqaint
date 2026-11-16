@@ -4,6 +4,7 @@
  * 上传表单（POST /works/import，multipart，字段按顺序读取，见 internal/server/api_works.go）：
  *   zip：   source=zip，name=文件名，file=zip 包
  *   文件夹：source=dir，name=文件夹名，然后每个文件一对 path（相对路径，含文件夹名）+ file
+ *   角色卡：source=card，name=文件名，file=角色卡（PNG / .charx / .json，由后端解析成作品）
  */
 
 const MiB = 1024 * 1024
@@ -19,6 +20,8 @@ export const IMPORT_LIMITS = {
   maxFiles: 5000,
   /** 上传请求体比作品总量多留的余量（zip 头与表单分隔），见 work.Limits.UploadLimit */
   uploadSlack: 16 * MiB,
+  /** 角色卡单文件上限（与后端 work.maxCardBytes 一致） */
+  maxCard: 64 * MiB,
 }
 
 /**
@@ -37,27 +40,36 @@ export interface FolderEntry {
   file: File
 }
 
-/** 要导入的内容：一个 zip 包，或一个文件夹。 */
-export type ImportInput = { kind: 'zip'; file: File } | { kind: 'folder'; name: string; entries: FolderEntry[] }
+/** 要导入的内容：一个 zip 包、一张角色卡，或一个文件夹。 */
+export type ImportInput =
+  { kind: 'zip'; file: File } | { kind: 'card'; file: File } | { kind: 'folder'; name: string; entries: FolderEntry[] }
 
 /** 选择或拖入的内容不能导入的原因（文案见 i18n 的 import.problems）。 */
-export type InputProblem = 'empty' | 'notZip' | 'multiple' | 'tooLarge' | 'tooManyFiles' | 'readFailed'
+export type InputProblem = 'empty' | 'notZip' | 'multiple' | 'tooLarge' | 'tooLargeCard' | 'tooManyFiles' | 'readFailed'
 
 /** 玩家选择或拖入的结果：可以导入的内容，或者不能导入的原因。 */
 export type Picked = ImportInput | { kind: 'problem'; problem: InputProblem }
 
 export const problem = (p: InputProblem): Picked => ({ kind: 'problem', problem: p })
 
+/** 是否角色卡：SillyTavern 的 PNG（角色数据在 tEXt 文本块里）、.charx 压缩包或裸 .json。 */
+export function isCardFile(f: { name: string }): boolean {
+  return /\.(png|charx|json)$/i.test(f.name)
+}
+
 /** 是否 zip 包：看扩展名与 MIME 类型（Windows 上 zip 的 MIME 常是 application/x-zip-compressed）。 */
 export function isZipFile(f: { name: string; type: string }): boolean {
   return /\.zip$/i.test(f.name) || ['application/zip', 'application/x-zip-compressed'].includes(f.type)
 }
 
-/** 选择的 zip 文件 → 导入内容。 */
-export function pickedFromZip(files: ArrayLike<File> | null | undefined): Picked {
+/** 选择的单个文件 → 导入内容：zip 作品包，或一张角色卡。 */
+export function pickedFromFile(files: ArrayLike<File> | null | undefined): Picked {
   if (!files || files.length === 0) return problem('empty')
   if (files.length > 1) return problem('multiple')
-  return isZipFile(files[0]) ? { kind: 'zip', file: files[0] } : problem('notZip')
+  const file = files[0]
+  if (isZipFile(file)) return { kind: 'zip', file }
+  if (isCardFile(file)) return { kind: 'card', file }
+  return problem('notZip')
 }
 
 /**
@@ -79,19 +91,21 @@ export function pickedFromFileList(files: ArrayLike<File> | null | undefined): P
   return pickedFromFolder(Array.from(files ?? [], (file) => ({ path: file.webkitRelativePath || file.name, file })))
 }
 
-/** 导入内容的显示名（zip 文件名或文件夹名）。 */
+/** 导入内容的显示名（文件名或文件夹名）。 */
 export function inputName(input: ImportInput): string {
-  return input.kind === 'zip' ? input.file.name : input.name
+  return input.kind === 'folder' ? input.name : input.file.name
 }
 
 /** 要上传的字节数。 */
 export function inputSize(input: ImportInput): number {
-  return input.kind === 'zip' ? input.file.size : input.entries.reduce((n, e) => n + e.file.size, 0)
+  if (input.kind === 'folder') return input.entries.reduce((n, e) => n + e.file.size, 0)
+  return input.file.size
 }
 
 /** 上传前的限制检查：超过时返回原因。 */
 export function checkInput(input: ImportInput): InputProblem | null {
   const size = inputSize(input)
+  if (input.kind === 'card') return size > IMPORT_LIMITS.maxCard ? 'tooLargeCard' : null
   if (input.kind === 'zip') return size > IMPORT_LIMITS.maxTotal + IMPORT_LIMITS.uploadSlack ? 'tooLarge' : null
   // .aintignore 由后端处理，这里只能按上传的总量算；条目数与后端一样留出十倍余量
   if (size > IMPORT_LIMITS.maxTotal) return 'tooLarge'
@@ -102,6 +116,12 @@ export function checkInput(input: ImportInput): InputProblem | null {
 /** 生成上传表单。字段顺序有意义：后端流式读取，source 与 name 在前，每个文件的 path 紧挨在 file 之前。 */
 export function buildImportForm(input: ImportInput): FormData {
   const form = new FormData()
+  if (input.kind === 'card') {
+    form.append('source', 'card')
+    form.append('name', input.file.name)
+    form.append('file', input.file, input.file.name)
+    return form
+  }
   if (input.kind === 'zip') {
     form.append('source', 'zip')
     form.append('name', input.file.name)

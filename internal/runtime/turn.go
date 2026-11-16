@@ -250,6 +250,8 @@ func (m *Manager) prepare(ctx context.Context, saveID, turnID, parentID string, 
 func (m *Manager) loop(ctx context.Context, d *draft) {
 	toolTextRepairs := 0
 	unrepaired := map[string]bool{}
+	refusalRescues := 0
+	refusalRescued := false
 	for {
 		if ctx.Err() != nil {
 			d.stopCanceled(ctx)
@@ -358,7 +360,7 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 				d.stopToolText()
 				return
 			}
-			if d.choices == nil && (d.isChoices() || (d.work.Manifest.Features.ForceChoices && d.hasNarrative())) {
+			if d.choices == nil && (d.isChoices() || refusalRescued || (d.work.Manifest.Features.ForceChoices && d.hasNarrative())) {
 				if !d.completingChoices {
 					d.completingChoices = true
 					text := prompts.ForceChoicesNotice
@@ -411,6 +413,15 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 			d.addNotice("error", d.errMsg)
 			return
 		default: // refusal
+			if res.stop == llm.StopRefusal && !d.isChoices() && refusalRescues < 2 {
+				refusalRescues++
+				refusalRescued = true
+				notice := llm.Message{Role: llm.RoleUser, Parts: []llm.Part{llm.Text(prompts.RefusalRescue)}}
+				d.req.Messages = append(d.req.Messages, notice)
+				d.turnMsgs = append(d.turnMsgs, notice)
+				slog.InfoContext(ctx, "模型拒答，直接收束并给选项", "attempt", refusalRescues)
+				continue
+			}
 			d.stop = string(res.stop)
 			if res.stop == llm.StopRefusal {
 				d.addNotice("warn", "模型拒绝继续这段内容，可以换一种写法再试。")

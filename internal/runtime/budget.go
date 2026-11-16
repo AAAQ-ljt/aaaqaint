@@ -19,7 +19,7 @@ type Budget struct {
 
 // DefaultBudget 是默认预算。
 var DefaultBudget = Budget{
-	MaxCalls: 12, MaxToolCalls: 40, MaxContinuations: 3, MaxOutputCap: 32_000, WallClock: 10 * time.Minute,
+	MaxCalls: 12, MaxToolCalls: 40, MaxContinuations: 3, MaxOutputCap: 32_000, WallClock: 30 * time.Minute,
 }
 
 // BudgetDefaults 返回未被全局或存档设置覆盖的运行时预算。
