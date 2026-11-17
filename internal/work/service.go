@@ -237,6 +237,14 @@ func summaryOf(w workRow, v versionRow) Summary {
 	}
 }
 
+// Touch 更新作品的最近活动时间，供书架按最近游玩排序。
+func (s *Service) Touch(ctx context.Context, id string) error {
+	return s.db.Tx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `UPDATE works SET updated_at = ? WHERE id = ?`, store.NowMillis(), id)
+		return err
+	})
+}
+
 // List 返回全部作品（按更新时间倒序）。
 func (s *Service) List(ctx context.Context) ([]Summary, error) {
 	rows, err := listWorks(ctx, s.db.Read())

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -83,6 +84,12 @@ func (s *Server) getSave(w http.ResponseWriter, r *http.Request) error {
 	p, err := s.d.Runtime.Presentation(r.Context(), r.PathValue("id"))
 	if err != nil {
 		return err
+	}
+	// 打开存档即视为本次游玩：作品回到书架最前（排序按 works.updated_at）。
+	if p.Save != nil {
+		if err := s.d.Works.Touch(r.Context(), p.Save.WorkID); err != nil {
+			slog.WarnContext(r.Context(), "更新作品最近时间失败", "work_id", p.Save.WorkID, "err", err)
+		}
 	}
 	writeJSON(w, http.StatusOK, p)
 	return nil

@@ -82,6 +82,10 @@ func (s *Service) Create(ctx context.Context, p CreateParams) (*Save, error) {
 	if err != nil {
 		return nil, fmt.Errorf("创建存档失败: %w", err)
 	}
+	// 新存档让作品回到书架最前（排序按 works.updated_at）。
+	if err := s.works.Touch(ctx, sv.WorkID); err != nil {
+		slog.WarnContext(ctx, "更新作品最近时间失败", "work_id", sv.WorkID, "err", err)
+	}
 	slog.InfoContext(ctx, "已新建存档", "save_id", sv.ID, "work_id", sv.WorkID, "version_id", versionID)
 	return sv, nil
 }

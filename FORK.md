@@ -16,10 +16,12 @@ AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署�
 ### 服务端
 
 - `internal/server/middleware.go`：`hostGuard` 增加 `AINT_ALLOWED_HOSTS` 环境变量，按域名放行反向代理与隧道转发过来的请求；默认行为不变，仍只接受 IP 字面量与 localhost。
+- 书架排序：打开存档或新建存档时更新 `works.updated_at`，作品按最近游玩倒序排列（`internal/work/service.go` 的 `Touch`、`internal/save/service.go`、`internal/server/api_saves.go`）。
 
 ### 运行时
 
 - `internal/runtime/turn.go`：模型返回拒答时，追加一次收束提示并重试，最多两次；仍未产出时按原有路径提示换写法。
+- 记忆索引（同步上游 `1f47a41`）：阶段开始时优先注入 `/memory/index.md` 的完整内容，文件不存在时回退到自动目录；整理流程增加同步索引与核对状态的步骤。涉及 `internal/save/memory.go`、`internal/contextx`、`internal/runtime/compact*.go`、`internal/prompts`。
 
 ### 作品
 
@@ -28,7 +30,7 @@ AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署�
 
 ### 与上游仍有差异的部分
 
-本快照基于较早的代码整理，部分文件与上游 `main` 的较新提交不同（例如记忆整理状态、自动调试记录）。这些差异来自快照时点与本地取舍，不是对上游的回退。
+上游 `9277658` 的阅读器自动调试记录尚未同步：本地仍由阅读页顶栏的调试开关手动控制。
 
 ## 许可
 
