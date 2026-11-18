@@ -250,6 +250,8 @@ func (m *Manager) prepare(ctx context.Context, saveID, turnID, parentID string, 
 func (m *Manager) loop(ctx context.Context, d *draft) {
 	toolTextRepairs := 0
 	unrepaired := map[string]bool{}
+	refusalRescues := 0
+	refusalRescued := false
 	for {
 		if ctx.Err() != nil {
 			d.stopCanceled(ctx)
@@ -267,7 +269,22 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 				slog.WarnContext(ctx, "回合内整理失败，照常继续", "err", err)
 			}
 		}
+		before := slices.Clone(d.display)
 		res, err := m.callOnce(ctx, d)
+		refusal := err != nil && res != nil && llm.KindOf(err) == llm.ErrRefusal
+		refusalMarked := false
+		if refusal {
+			_, refusalMarked = refusalCut(res.msg.TextOf())
+		}
+		plainRefusal := refusal && refusalMarked && len(res.textTools) == 0 && len(res.msg.ToolCalls()) == 0
+		if plainRefusal {
+			if d.operation == nil && !d.reviewing && !d.completingChoices {
+				res.msg = d.absorbRefusal(res.msg, before)
+				m.publish(d.save.ID, event.TurnReset, event.TurnResetData{TurnID: d.id, Seq: d.seq, Items: slices.Clone(d.display)})
+			} else {
+				res.msg = withoutRefusal(res.msg)
+			}
+		}
 		// 模型报上下文超限：紧急整理后重试一次（13.2 第 3 点）
 		if err != nil && ctx.Err() == nil && llm.KindOf(err) == llm.ErrContextOverflow && !d.compactionAttempted && !d.isChoices() {
 			if cerr := m.compactInTurn(ctx, d, compact.ReasonOverflow); cerr == nil {
@@ -298,16 +315,31 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 			}
 		}
 		if err != nil {
+			if plainRefusal && refusalRescues < maxRefusalRescues && d.operation == nil && !d.reviewing && !d.completingChoices {
+				refusalRescues++
+				refusalRescued = true
+				d.status = ""
+				d.stop, d.stopRaw, d.err, d.errMsg, d.notice = "", "", nil, "", ""
+				d.continuing = d.lastText() != ""
+				notice := llm.Message{Role: llm.RoleUser, Parts: []llm.Part{llm.Text(prompts.RefusalRescue)}}
+				d.req.Messages = append(d.req.Messages, notice)
+				d.turnMsgs = append(d.turnMsgs, notice)
+				continue
+			}
 			d.status = save.StatusInterrupted
 			if ctx.Err() != nil {
 				d.stopCanceled(ctx)
 			} else {
 				d.stop, d.err, d.errMsg = "error", err, err.Error()
-				if llm.KindOf(err) == llm.ErrRefusal {
+				if refusal {
 					d.stop = string(llm.StopRefusal)
 				}
-				_, msg, _ := describeError(err)
-				d.addNotice("error", msg)
+				if refusalRescued {
+					d.addNotice("warn", "模型连续拒答，已保留正文，可以重新生成或换一种写法再试。")
+				} else {
+					_, msg, _ := describeError(err)
+					d.addNotice("error", msg)
+				}
 			}
 			return
 		}
@@ -368,7 +400,12 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 				d.stopToolText()
 				return
 			}
-			if d.choices == nil && (d.isChoices() || (d.work.Manifest.Features.ForceChoices && d.hasNarrative())) {
+			if refusalRescued && d.choices == nil && !d.hasNarrative() {
+				d.stop, d.status = string(llm.StopRefusal), save.StatusInterrupted
+				d.addNotice("warn", "模型没有继续写出正文，可以重新生成或换一种写法再试。")
+				return
+			}
+			if d.choices == nil && (d.isChoices() || ((d.work.Manifest.Features.ForceChoices || refusalRescued) && d.hasNarrative())) {
 				if !d.completingChoices {
 					d.completingChoices = true
 					text := prompts.ForceChoicesNotice
@@ -548,6 +585,7 @@ func (m *Manager) callOnce(ctx context.Context, d *draft) (*callResult, error) {
 	res := &callResult{}
 	var u llm.Usage
 	var streamErr error
+streamLoop:
 	for {
 		ev, err := stream.Next()
 		if errors.Is(err, io.EOF) {
@@ -567,6 +605,9 @@ func (m *Manager) callOnce(ctx context.Context, d *draft) (*callResult, error) {
 		case llm.Done:
 			// 工具调用以 Done.Message 为准（含协议原生数据）；ToolCallStart/ArgsDelta 目前不单独处理。
 			res.msg, res.stop, res.raw, u = ev.Message, ev.Stop, ev.Raw, ev.Usage
+			if ev.Stop == llm.StopRefusal {
+				break streamLoop
+			}
 		}
 	}
 	// 取消时尚未确认的标签前缀只保留在原始消息中，不向玩家显示半个工具名。

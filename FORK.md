@@ -21,6 +21,7 @@ AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署�
 ### 运行时
 
 - 记忆索引（同步上游 `1f47a41`）：阶段开始时优先注入 `/memory/index.md` 的完整内容，文件不存在时回退到自动目录；整理流程增加同步索引与核对状态的步骤。涉及 `internal/save/memory.go`、`internal/contextx`、`internal/runtime/compact*.go`、`internal/prompts`。
+- 拒答自动收束：纯叙事拒答时保留已经写出的正文、丢弃拒绝语，并追加一次收束提示后重试；前端收到 `turn.reset` 后用服务端正文快照替换已流出的文字。涉及 `internal/runtime/refusal.go`、`internal/runtime/turn.go`、`internal/event/types.go`、`web/src/stores/reader.ts`。
 
 ### 作品
 
@@ -30,7 +31,6 @@ AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署�
 ### 已同步的上游功能
 
 - 已同步上游 `v0.2.1-alpha.1`（8 个提交）：Windows 系统手动代理、Android Termux 域名解析、拒答与异常流终止识别、整理结果按事务提交并在中断后保留重试目标、阅读器中断提示与重试。
-- 同步后移除了本地早先的“拒答自动重试”补丁，改为上游的明确中断提示（正文保留，可换写法重试）。
 
 ### 与上游仍有差异的部分
 

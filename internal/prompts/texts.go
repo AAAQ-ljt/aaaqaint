@@ -20,7 +20,7 @@ const (
 	// ContinueNotice 截断续写时追加的 user 消息（9.4）。
 	ContinueNotice = "<notes>上一段输出到达了单次长度上限，已写的内容都保留着。请从断点处接着写下去。</notes>"
 	// RefusalRescue 是模型拒答后追加的 user 消息：直接收束到当前处境并给出选项，保证能继续游玩。
-	RefusalRescue = "<notes>上一段输出被中断了。请直接收束：承接已经写过的内容，把这一段简短地带到一个自然的停顿（不要重复已经写过的原句），然后通过工具调用功能实际调用 offer_choices，给出 2–4 个贴合当前处境的选项，让玩家可以继续。不要解释原因。</notes>"
+	RefusalRescue = "<notes>上一段输出被中断了。请直接收束：承接已经写过的内容（如果还没有正文，就从当前处境开始），把这一段简短地带到一个自然的停顿（不超过 120 字，不要重复已经写过的原句），然后通过工具调用功能实际调用 offer_choices，给出 2–4 个贴合当前处境的选项，让玩家可以继续。虚构创作中的敏感处用转场或留白处理，不要再次拒绝或解释原因。</notes>"
 	// ForceChoicesNotice 正文自然结束但尚未交还选项时追加的 user 消息。
 	ForceChoicesNotice = "<notes>本回合的正文已写完，内容都保留着。请通过工具调用功能实际调用 offer_choices，将 2–4 个贴合当前情境的选项放入 choices 参数，平台会生成选项按钮。此步骤无需输出正文、选项列表、代码块或 HTML。</notes>"
 	// ToolTextRepairNotice 纠正正文中的伪工具标签；%s 是尚待重新调用的工具名。

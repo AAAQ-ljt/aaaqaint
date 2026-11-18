@@ -24,6 +24,8 @@ export interface EventMap {
   'turn.pending': { turn_id: string; parent_id: string; input: TurnInput; operation?: TurnOperation }
   'turn.started': { turn_id: string; parent_id: string; input: TurnInput; operation?: TurnOperation }
   'turn.text': { turn_id: string; seq: number; delta: string }
+  /** 用服务端正文快照替换本回合已流出的内容（拒答收束时截掉拒绝语） */
+  'turn.reset': { turn_id: string; seq: number; items: DisplayItem[] }
   'turn.tool': { turn_id: string; call_id: string; name: string; phase: 'start' | 'done' | 'error'; display?: string }
   'turn.display': { turn_id: string; item: DisplayItem }
   'turn.choices': {
@@ -72,6 +74,7 @@ export const EVENT_TYPES: EventType[] = [
   'turn.pending',
   'turn.started',
   'turn.text',
+  'turn.reset',
   'turn.tool',
   'turn.display',
   'turn.choices',

@@ -176,6 +176,11 @@ export function reduceEvent(s: Snapshot, ev: AnyEvent): Snapshot {
       else items.push({ t: 'text', markup: ev.data.delta })
       return { ...s, draft: { ...d, items, seq: ev.data.seq } }
     }
+    case 'turn.reset': {
+      const d = s.draft
+      if (!d || d.turnId !== ev.data.turn_id) return s
+      return { ...s, draft: { ...d, items: [...ev.data.items], seq: ev.data.seq } }
+    }
     case 'turn.tool': {
       const d = s.draft
       if (!d || d.turnId !== ev.data.turn_id || ev.data.display !== 'subtle') return s

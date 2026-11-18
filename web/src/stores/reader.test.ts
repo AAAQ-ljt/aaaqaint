@@ -78,6 +78,14 @@ describe('reduceEvent', () => {
     s = reduceEvent(s, ev({ type: 'turn.text', data: { turn_id: 't1', seq: 2, delta: '很浓' } }))
     expect(s.draft?.items).toEqual([{ t: 'text', markup: '雾很浓' }])
   })
+  it('turn.reset 替换已流出的正文，后续增量从新快照继续', () => {
+    let s = reduceEvent(empty, ev({ type: 'turn.started', data: { turn_id: 't1', parent_id: 'p', input: { kind: 'free', text: '推门' } } }))
+    s = reduceEvent(s, ev({ type: 'turn.text', data: { turn_id: 't1', seq: 1, delta: '门后有脚步声。\n\n抱歉，我不能继续。' } }))
+    s = reduceEvent(s, ev({ type: 'turn.reset', data: { turn_id: 't1', seq: 1, items: [{ t: 'text', markup: '门后有脚步声。' }] } }))
+    expect(s.draft?.items).toEqual([{ t: 'text', markup: '门后有脚步声。' }])
+    s = reduceEvent(s, ev({ type: 'turn.text', data: { turn_id: 't1', seq: 2, delta: '脚步声停了。' } }))
+    expect(s.draft?.items).toEqual([{ t: 'text', markup: '门后有脚步声。脚步声停了。' }])
+  })
 
   it('忽略其他回合的事件', () => {
     let s = reduceEvent(empty, ev({ type: 'turn.started', data: { turn_id: 't1', parent_id: 'p', input: { kind: 'opening' } } }))

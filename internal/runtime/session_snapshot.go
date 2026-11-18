@@ -82,6 +82,13 @@ func (m *Manager) updateSnapshot(saveID string, data any, typ string) any {
 				d.Items = append(d.Items, save.DisplayItem{T: "text", Markup: v.Delta})
 			}
 		}
+	case event.TurnResetData:
+		if d := s.Turn; d != nil && d.TurnID == v.TurnID {
+			if items, ok := v.Items.([]save.DisplayItem); ok {
+				d.Items = slices.Clone(items)
+			}
+			d.Seq = v.Seq
+		}
 	case event.TurnDisplayData:
 		if d := s.Turn; d != nil && d.TurnID == v.TurnID {
 			d.Items = append(d.Items, v.Item.(save.DisplayItem))

@@ -14,6 +14,7 @@ const (
 
 	TurnStarted   = "turn.started"   // TurnStartedData
 	TurnText      = "turn.text"      // TurnTextData：已去重的标记文本增量
+	TurnReset     = "turn.reset"     // TurnResetData：用服务端正文快照替换本回合已流出的内容
 	TurnTool      = "turn.tool"      // TurnToolData
 	TurnDisplay   = "turn.display"   // TurnDisplayData：骰子卡等展示项
 	TurnChoices   = "turn.choices"   // TurnChoicesData
@@ -53,6 +54,13 @@ type TurnTextData struct {
 	TurnID string `json:"turn_id"`
 	Seq    int    `json:"seq"` // 回合内递增，前端据此去重与检测丢失
 	Delta  string `json:"delta"`
+}
+
+// TurnResetData 用完整正文替换本回合已流出的内容，用于截掉模型拒答等不应显示的文字。
+type TurnResetData struct {
+	TurnID string `json:"turn_id"`
+	Seq    int    `json:"seq"`
+	Items  any    `json:"items"` // []save.DisplayItem
 }
 
 type TurnToolData struct {
