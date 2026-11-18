@@ -20,13 +20,17 @@ AINT 是本地运行的 AI 互动小说运行时。本仓库用于个人部署�
 
 ### 运行时
 
-- `internal/runtime/turn.go`：模型返回拒答时，追加一次收束提示并重试，最多两次；仍未产出时按原有路径提示换写法。
 - 记忆索引（同步上游 `1f47a41`）：阶段开始时优先注入 `/memory/index.md` 的完整内容，文件不存在时回退到自动目录；整理流程增加同步索引与核对状态的步骤。涉及 `internal/save/memory.go`、`internal/contextx`、`internal/runtime/compact*.go`、`internal/prompts`。
 
 ### 作品
 
 - `internal/work/cardimport.go`：导入 SillyTavern 角色卡（PNG 中的 `ccv3`/`chara` 文本块、`.charx` 压缩包或裸 JSON），合成为 AINT 作品目录。
 - `internal/store/migrations/0002_work_title.sql`：`works.title_override`，用于只改作品显示名。前端对应 `WorkRenameDialog`。
+
+### 已同步的上游功能
+
+- 已同步上游 `v0.2.1-alpha.1`（8 个提交）：Windows 系统手动代理、Android Termux 域名解析、拒答与异常流终止识别、整理结果按事务提交并在中断后保留重试目标、阅读器中断提示与重试。
+- 同步后移除了本地早先的“拒答自动重试”补丁，改为上游的明确中断提示（正文保留，可换写法重试）。
 
 ### 与上游仍有差异的部分
 

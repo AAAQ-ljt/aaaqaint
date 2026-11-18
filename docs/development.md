@@ -98,7 +98,7 @@ go run ./cmd/aint serve --data .devdata --fake-llm testdata/fake/my-case.yaml
 - **很快触发整理**：新建存档时把预算调低（存档设置覆盖全局设置），例如
   `POST /api/v1/saves {"work_id": "aint.inverted-stars", "settings": {"context_budget": 16000, "keep_recent": 2000}}`，
   具体触发回合数取决于作品常驻内容与已生成正文；也可以点用量环里的"立即整理"或输入 `/compact`。全局默认值在设置 → 上下文。
-- **整理做了什么**：日志 `上下文整理完成`（原因、方式、摘要掉的回合区间、保留起点、落盘写了几个文件、整理前后的上下文规模、调用次数）；
+- **整理做了什么**：日志 `交接摘要已生成`（原因、方式、摘要掉的回合区间、保留起点、记忆改动数量、整理前后的上下文规模、调用次数）。是否采用以 `compaction.done` 及其节点为准；
   整理节点的 `epoch_block` 是新阶段块（blob，文本），`messages` 是整理过程的全部消息（不进入之后的上下文）；`--trace-llm` 中用途为 `compact` 的调用。
 - **之后的请求长什么样**：`--trace-llm` 中整理之后的第一个 `narrate` 请求，首条消息是新阶段块，后接保留的回合（推理与协议原生内容已去掉）。
 - **状态与索引**：整理中的 `update_state` 结果只随整理成功提交；检查器可查看各次工具后的状态。新阶段的 `<memory_index path="/memory/index.md">` 包含整理后的完整索引，文件不存在时才使用自动目录。回合内整理拒绝修改当前回合已写入的路径及其上下级，其他修改与草稿结果合并。
@@ -156,7 +156,8 @@ task test
   交还选项、状态维护与面板渲染，并以场外提问检查事实召回（答案写进报告，人工核对）：
   `AINT_EVAL=<live.json 的绝对路径> AINT_EVAL_MODEL=<名称> go test ./internal/runtime -run TestEval -v -timeout 60m`；
   报告在 `.local/eval/<时间>/story.md`（`AINT_EVAL_OUT` 可指定），`AINT_EVAL_TRACE=<目录>` 录制原始报文。
-- Playwright 端到端：在 `web/` 首次执行 `pnpm exec playwright install chromium`，之后在仓库根执行 `task test:e2e`。测试使用独立临时目录、7879 / 5179 端口与假模型，不读取真实密钥；失败追踪位于 `web/test-results/`，CI 会上传。
+- Playwright 端到端：在 `web/` 首次执行 `pnpm exec playwright install chromium`，之后在仓库根执行 `task test:e2e`。测试使用独立临时目录、7879 / 5179 端口与假模型，不读取真实密钥；仅失败时保留 Playwright 追踪供 CI 上传，位置为 `web/test-results/`。追踪保留操作和 DOM 快照，不采集屏幕图像。
+- 阅读页中断与整理：在 `web/` 执行 `pnpm exec playwright test operation-notices.spec.ts interruption.spec.ts`。断言检查三种视口下提示的位置、宽度与可用操作。停止、关闭、检查器和整理操作使用测试存档；过滤、协议中断等状态通过会话事件重放。
 - 《雾港来信》位于 `testdata/works/misty-harbor/`，由 Go 测试装配和 Playwright 全局准备导入；程序内嵌示例位于 `examples/works/`。
 - 尚缺：测试作品 T2 与真实模型 100 回合评测（M3-11）。完整情况见 [progress.md](progress.md) 第 6 节。
 - DeepSeek 工具纠正真实评测：`AINT_TOOL_TEXT_LIVE=<live.json 的绝对路径> go test ./internal/runtime -run '^TestToolTextLive$' -count=1 -v -timeout 35m`；默认跳过，覆盖两种接口与 off / low 推理的生成式开场、选项作答和状态更新，记录各回合纠正次数并检查发送历史。预算与报告见 [验证说明](notes/tool-text-recovery.md)。
@@ -190,20 +191,32 @@ Gemini 开场选项验证：`AINT_GEMINI_LIVE=<配置绝对路径> go test ./int
 task build
 ```
 
-- `CGO_ENABLED=0`，纯 Go（`modernc.org/sqlite`），七个目标平台可交叉编译：`task build:cross`（Windows / macOS / Linux 的 amd64 / arm64，以及 Android/arm64）。
-- 单独构建 Android/arm64：`task build:android`，包含前端，产物为 `dist/aint-android-arm64`。使用 `GOOS=android GOARCH=arm64 CGO_ENABLED=0`，不需要 Android NDK；其他 Android 架构需要外部链接工具链，暂未纳入。
-- Termux 使用独立的 Android 构建。Go 标准库在 Android 目标下跳过 `faccessat2`，Linux 构建会尝试调用该系统调用。
+- `task build` 构建本机桌面程序，不需要 Android NDK。Windows、macOS、Linux 的 amd64 / arm64 均关闭 CGO；七个平台共用 `modernc.org/sqlite`。
+- Android/arm64 启用 CGO，以 Android API 24 为编译目标，域名由 Android 系统的 `getaddrinfo` 解析。Termux 使用独立的 Android 构建，不使用 Linux/arm64 包。
+- `task build:android` 单独构建 Android，包含前端，产物为 `dist/aint-android-arm64`；`task build:cross` 构建全部七个目标。两者都需要先配置下方的 NDK。
 - 版本号由 `git describe` 注入 `internal/buildinfo`。
+
+**Android 构建机**：安装 Android NDK r30（SDK Manager：`sdkmanager --install 'ndk;30.0.16248370'`），将其中的 `toolchains/llvm/prebuilt/<宿主>/bin` 加到 `PATH`。Linux、macOS、Windows 的宿主目录分别为 `linux-x86_64`、`darwin-x86_64`、`windows-x86_64`。例如：
+
+```bash
+# Linux，NDK 由 SDK Manager 安装
+export PATH="$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin:$PATH"
+task build:android
+```
+
+Windows PowerShell：`$env:Path = "$env:ANDROID_HOME\ndk\30.0.16248370\toolchains\llvm\prebuilt\windows-x86_64\bin;$env:Path"`。使用独立下载的 NDK 时，替换为解压后的目录。CI 和发布优先使用运行器中此版本的 NDK，缺失时通过 SDK Manager 安装；运行发布包的手机不需要 NDK。
 
 ### 5.1 发布包
 
-`.goreleaser.yaml` 定义 Windows、macOS、Linux 的 amd64 / arm64，以及 Android/arm64 共七种产物，全部关闭 CGO。Android 包名为 `aint_<版本>_android_arm64.tar.gz`，面向 Termux。每份压缩包包含可执行文件、许可证、使用说明、创作指南、作品 Schema、aint-work 技能和两部示例 zip；`checksums.txt` 覆盖发布压缩包。
+`.goreleaser.yaml` 定义 Windows、macOS、Linux 的 amd64 / arm64，以及 Android/arm64 共七种产物。Android 包名为 `aint_<版本>_android_arm64.tar.gz`，面向 Termux。每份压缩包包含可执行文件、许可证、使用说明、创作指南、作品 Schema、aint-work 技能和两部示例 zip；`checksums.txt` 覆盖发布压缩包。
 
 ### 5.2 本地验证
 
 使用 GoReleaser 2.19.0 和仓库规定的 Go / pnpm 版本。先运行 `task check` 和 `task build:web`，再运行 `goreleaser check` 与 `goreleaser release --snapshot --clean`。快照不会上传发布页，不需要模型密钥。构建产物位于 `dist/`，示例暂存于 `.release/`。Schema 变更后运行 `go run ./cmd/schema-gen`；测试会检查定义与已提交的文件一致。
 
 验证七份包均有可执行文件、使用与创作说明、10 个 Schema、完整技能与两部示例 zip。在本机解压后使用临时数据目录启动，确认静态页面、`version` 和示例导入可用。其他系统的实际运行与发布候选版验收属于 M6-11。
+
+Android CI 检查可执行文件的 `GOOS=android`、`GOARCH=arm64`、`CGO_ENABLED=1` 以及对系统 `getaddrinfo` 的动态引用，并上传 `aint-android-arm64` 测试产物。真机验收：在 Termux 中停止旧进程，解包，用 `GODEBUG=netdns=2 ./aint serve --no-browser` 启动。在同一网络下直连拉取 DeepSeek 模型列表，确认列表返回且终端显示 `hostLookupOrder(api.deepseek.com) = cgo`。如需排除环境代理，可仅对该进程设置 `NO_PROXY='*'`。
 
 ### 5.3 GitHub Actions
 
