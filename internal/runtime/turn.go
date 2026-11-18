@@ -252,6 +252,7 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 	unrepaired := map[string]bool{}
 	refusalRescues := 0
 	refusalRescued := false
+	refusalWasMarked := false
 	for {
 		if ctx.Err() != nil {
 			d.stopCanceled(ctx)
@@ -278,6 +279,8 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 		}
 		// 伪工具标签留给工具文本修复；原生工具调用在错误路径不会执行，可以随拒答一起丢弃。
 		plainRefusal := refusal && refusalMarked && len(res.textTools) == 0
+		// 内容过滤可能只截断正文、不输出拒绝语；保留已写内容，同样收束一次。
+		retryRefusal := plainRefusal || (refusal && !refusalMarked && len(res.textTools) == 0 && d.hasNarrative())
 		if plainRefusal {
 			if d.operation == nil && !d.reviewing && !d.completingChoices {
 				res.msg = d.absorbRefusal(res.msg, before)
@@ -316,7 +319,10 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 			}
 		}
 		if err != nil {
-			if plainRefusal && refusalRescues < maxRefusalRescues && d.operation == nil && !d.reviewing && !d.completingChoices {
+			if retryRefusal && refusalRescues < maxRefusalRescues && d.operation == nil && !d.reviewing && !d.completingChoices {
+				if plainRefusal {
+					refusalWasMarked = true
+				}
 				refusalRescues++
 				refusalRescued = true
 				d.status = ""
@@ -335,7 +341,7 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 				if refusal {
 					d.stop = string(llm.StopRefusal)
 				}
-				if refusalRescued {
+				if refusalRescued && refusalWasMarked {
 					d.addNotice("warn", "模型连续拒答，已保留正文，可以重新生成或换一种写法再试。")
 				} else {
 					_, msg, _ := describeError(err)
