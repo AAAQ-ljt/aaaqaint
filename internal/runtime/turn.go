@@ -276,7 +276,8 @@ func (m *Manager) loop(ctx context.Context, d *draft) {
 		if refusal {
 			_, refusalMarked = refusalCut(res.msg.TextOf())
 		}
-		plainRefusal := refusal && refusalMarked && len(res.textTools) == 0 && len(res.msg.ToolCalls()) == 0
+		// 伪工具标签留给工具文本修复；原生工具调用在错误路径不会执行，可以随拒答一起丢弃。
+		plainRefusal := refusal && refusalMarked && len(res.textTools) == 0
 		if plainRefusal {
 			if d.operation == nil && !d.reviewing && !d.completingChoices {
 				res.msg = d.absorbRefusal(res.msg, before)
