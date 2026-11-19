@@ -485,6 +485,8 @@ func (d *draft) stopToolText() {
 	d.addNotice("warn", "模型未能正确调用工具，已保留故事正文，可以重新生成或点“继续”再试。")
 }
 
+const offerChoicesNeedsNarrative = "未执行：本回合还没有写出故事正文。请先用普通回复写出本回合的故事正文，再调用 offer_choices；不要只给选项。"
+
 // runTools 执行一批工具调用并把结果追加到消息中；返回是否遇到了终止型工具（offer_choices）。
 func (m *Manager) runTools(ctx context.Context, d *draft, calls []llm.ToolCall) (terminal bool) {
 	d.toolCalls += len(calls)
@@ -499,6 +501,24 @@ func (m *Manager) runTools(ctx context.Context, d *draft, calls []llm.ToolCall) 
 		allowed = rewriteMemoryTools
 	}
 	out := m.d.Tools.ExecuteAllowed(ctx, d, calls, allowed)
+	// offer_choices 只负责交还决定权，不能代替正文。普通回合、重写回合里若模型
+	// 直接把选项当成整条回复，就退回这次调用，让它在下一轮先写正文；
+	// 开场生成与“只补选项”的操作允许没有正文。
+	if out.Terminal != nil && d.choices != nil && !d.opening && !d.isChoices() && !d.completingChoices && !d.hasNarrative() {
+		d.choices = nil
+		for i := range out.Records {
+			if out.Records[i].ID == out.Terminal.ID {
+				out.Records[i].IsError = true
+				out.Records[i].Result = offerChoicesNeedsNarrative
+			}
+		}
+		out.Results = append(out.Results, llm.ToolResult{
+			CallID:  out.Terminal.ID,
+			IsError: true,
+			Parts:   []llm.Part{llm.Text(offerChoicesNeedsNarrative)},
+		})
+		slog.WarnContext(ctx, "拒绝无正文的选项调用", "save_id", d.save.ID, "turn_id", d.id, "call_id", out.Terminal.ID)
+	}
 	d.inspection.toolsDone(ctx, out, d.vfs, d.state)
 	d.toolLog = append(d.toolLog, out.Records...)
 

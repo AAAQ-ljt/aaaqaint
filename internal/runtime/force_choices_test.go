@@ -321,6 +321,75 @@ func TestForceChoicesTextIsolation(t *testing.T) {
 	}
 }
 
+func TestOfferChoicesRequiresNarrative(t *testing.T) {
+	opening := choiceResponse()
+	opening.Text = "门后传来了脚步声。"
+	choicesOnly := choiceResponse()
+	after := choiceResponse()
+	after.Text = "你推开门，走廊尽头亮着一盏灯。"
+
+	responses := []fake.Response{opening, choicesOnly, after}
+	for i := range responses {
+		responses[i].ChunkRunes, responses[i].DelayMS = 1000, 1
+	}
+	var reqs []*llm.Request
+	e, err := openEnvWith(t.Context(), t.TempDir(), fakeModels{recordingProvider{Provider: fake.New(&fake.Script{Responses: responses}), reqs: &reqs}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = e.close() })
+	sv := choicesSave(t, e, "features:\n  force_choices: true\n")
+	sub, _, _ := e.bus.Subscribe(event.SaveTopic(sv.ID), 0)
+	defer sub.Close()
+
+	if _, err := e.mgr.Submit(t.Context(), sv.ID, save.TurnInput{Kind: save.InputOpening}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, sub, event.TurnCommitted)
+	if _, err := e.mgr.Submit(t.Context(), sv.ID, save.TurnInput{Kind: save.InputChoice, ChoiceID: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, sub, event.TurnCommitted)
+
+	if len(reqs) != 3 {
+		t.Fatalf("空正文选项应被拒绝并重试，模型调用 %d 次，应为 3 次", len(reqs))
+	}
+	msgs := reqs[2].Messages
+	last := msgs[len(msgs)-1]
+	if len(last.Parts) == 0 || last.Parts[0].ToolResult == nil {
+		t.Fatalf("重试前应把拒绝结果回填给模型：%+v", last)
+	}
+	res := last.Parts[0].ToolResult
+	if !res.IsError || len(res.Parts) == 0 || !strings.Contains(res.Parts[0].Text, "还没有写出故事正文") {
+		t.Fatalf("拒绝结果应说明缺正文：%+v", res)
+	}
+
+	tl, err := e.saves.Timeline(t.Context(), sv.ID, "", 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	node := tl.Nodes[len(tl.Nodes)-1]
+	if node.Stop != "choices" || node.Status == save.StatusInterrupted {
+		t.Fatalf("重试成功后应以选项结束：stop=%s status=%s", node.Stop, node.Status)
+	}
+	var shown strings.Builder
+	hasChoices := false
+	for _, it := range node.Display {
+		switch it.T {
+		case "text":
+			shown.WriteString(it.Markup)
+		case "choices":
+			hasChoices = true
+		}
+	}
+	if !strings.Contains(shown.String(), "你推开门") {
+		t.Fatalf("重试回合应保留正文：%+v", node.Display)
+	}
+	if !hasChoices {
+		t.Fatalf("重试回合应保留选项：%+v", node.Display)
+	}
+}
+
 // choicesGate 在补调用开始时通知测试，并等待取消。
 type choicesGate struct {
 	llm.Provider
